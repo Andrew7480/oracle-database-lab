@@ -1,4 +1,4 @@
-# Oracle Database Lab — Academic Version
+# Oracle Database Lab — Academic Version 2
 
 Training repository for Oracle Database administration, testing, change management and Git workflows.
 
