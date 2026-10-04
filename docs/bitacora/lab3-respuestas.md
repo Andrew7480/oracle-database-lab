@@ -23,9 +23,11 @@ El estado `Exited (0)` indica que el proceso principal del contenedor terminó y
 
 ### 4. En `-p 8181:8181`, ¿qué número corresponde a tu equipo y cuál al contenedor? ¿Qué pasaría con `-p 80:8080` en el ejercicio de nginx?
 
-El formato de `-p` es **puerto del equipo anfitrión : puerto del contenedor**. Por tanto, en `-p 8181:8181`, el primer `8181` corresponde al puerto de mi equipo y el segundo al puerto que escucha dentro del contenedor.
+El formato de `-p` es **puerto del equipo anfitrión : puerto del contenedor**. Por tanto, en `-p 8181:8181`, el primer `8181` corresponde al puerto de mi equipo y el segundo `8181` al puerto que está expuesto dentro del contenedor.
 
-En el ejercicio de nginx, el mapeo utilizado fue `-p 8080:80`: las peticiones realizadas al puerto `8080` del equipo se redirigen al puerto `80` del contenedor, donde escucha nginx. Si se utilizara `-p 80:8080`, se invertiría el sentido del mapeo: el equipo expondría el puerto `80` y Docker enviaría las peticiones al puerto `8080` del contenedor. Si nginx siguiera escuchando en el puerto `80`, esa configuración no funcionaría porque no coincidiría con el puerto donde está escuchando el servicio.
+En el ejercicio de nginx se utilizó `-p 8080:80`. Esto significa que una petición realizada en el puerto `8080` de mi equipo es reenviada al puerto `80` del contenedor, que es donde nginx está escuchando.
+
+Si se utilizara `-p 80:8080`, el puerto `80` de mi equipo se conectaría con el puerto `8080` del contenedor. **No se está invirtiendo el sentido del mapeo**, sino cambiando qué puertos se asocian: host `80` → contenedor `8080`. Como nginx continúa escuchando en el puerto `80` dentro del contenedor, las peticiones llegarían al puerto `8080`, donde no habría ningún servicio escuchando, por lo que el acceso a nginx no funcionaría.
 
 ### 5. ¿Por qué un contenedor de Oracle se queda en marcha y el de `hello-world` termina solo?
 
