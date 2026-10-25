@@ -275,3 +275,149 @@ La verificación final informa `RESULTADO: TODO OK`. Entre los resultados regist
 - Evidencias generadas y archivos de configuración y secretos comprobados.
 
 **Evidencia:** `docs/bitacora/lab4/evidencia/script/20261025T215153Z_10-verificacion-final.script.log`, líneas 1–32.
+
+
+## Preguntas tipo examen
+
+### P1. Copia en frío consistente
+
+Un DBA ejecuta `SHUTDOWN IMMEDIATE` y copia todos los datafiles, control files y redo logs online. ¿Qué afirmaciones son correctas sobre esta copia? (Elige dos.)
+
+- A. Es una copia consistente: al restaurarla no necesita recuperación con redo.
+- B. Solo es válida si la base estaba en modo ARCHIVELOG.
+- C. Es una copia inconsistente porque las transacciones en curso se perdieron.
+- D. Puede restaurarse y abrirse directamente con STARTUP.
+- E. Debe restaurarse con RMAN obligatoriamente.
+
+**Respuesta: A y D.**
+
+Después de un `SHUTDOWN IMMEDIATE`, la base queda cerrada de forma consistente, por lo que una copia de datafiles, control files y redo logs puede restaurarse sin necesidad de recuperación con redo y abrirse directamente mediante `STARTUP`. El uso de ARCHIVELOG o RMAN no es obligatorio para este tipo de copia en frío.
+
+### P2. Reubicación de un datafile
+
+Un tablespace de usuario tiene su datafile en un disco que se va a retirar. La base es Standard Edition y puede tener una breve indisponibilidad de ese tablespace. ¿Qué secuencia es correcta?
+
+- A. `ALTER DATABASE MOVE DATAFILE` con la base abierta.
+- B. `ALTER TABLESPACE ... OFFLINE`; copiar el archivo con el sistema operativo; `ALTER TABLESPACE ... RENAME DATAFILE`; `ALTER TABLESPACE ... ONLINE`.
+- C. `ALTER TABLESPACE ... RENAME DATAFILE` con el tablespace ONLINE; Oracle copia el archivo.
+- D. `SHUTDOWN ABORT`; mover el archivo; `STARTUP`.
+
+**Respuesta: B.**
+
+Se pone el tablespace `OFFLINE`, se mueve físicamente el datafile con el sistema operativo, se actualiza su ubicación mediante `ALTER TABLESPACE ... RENAME DATAFILE` y finalmente se vuelve a poner `ONLINE`. Esta opción permite una breve indisponibilidad del tablespace sin necesidad de apagar toda la base de datos.
+
+### P3. Información de la instancia y de la base de datos
+
+Un DBA consulta `V$INSTANCE` y `V$DATABASE` en una base abierta. ¿Qué dos afirmaciones son correctas? (Elige dos.)
+
+- A. `STARTUP_TIME` de `V$INSTANCE` cambia cada vez que se arranca la instancia.
+- B. `DBID` de `V$DATABASE` cambia cada vez que se recrea el contenedor.
+- C. `CREATED` de `V$DATABASE` indica cuándo se creó la base, no cuándo se arrancó.
+- D. Una instancia puede montar dos bases de datos a la vez si tienen distinto DBID.
+- E. `V$DATABASE` solo se puede consultar con la base en OPEN.
+
+**Respuesta: A y C.**
+
+### P4. Operaciones en estado NOMOUNT
+
+La instancia está en estado `NOMOUNT`. ¿Qué dos operaciones puede realizar el DBA en este estado? (Elige dos.)
+
+- A. Consultar `V$PARAMETER`.
+- B. Consultar `DBA_USERS`.
+- C. Recrear el control file con `CREATE CONTROLFILE`.
+- D. Cambiar la base a modo ARCHIVELOG.
+- E. Renombrar el datafile del tablespace SYSTEM.
+
+**Respuesta: A y C.**
+
+### P5. Cambio al modo ARCHIVELOG
+
+¿En qué etapa debe estar la base para ejecutar `ALTER DATABASE ARCHIVELOG`?
+
+- A. NOMOUNT
+- B. MOUNT
+- C. OPEN READ WRITE
+- D. OPEN RESTRICTED
+
+**Respuesta: B.**
+
+### P6. Modificación de un parámetro con SPFILE
+
+Un DBA ejecuta `ALTER SYSTEM SET open_cursors = 500;` en una instancia que arrancó con SPFILE. ¿Cuál es el resultado?
+
+- A. El cambio se aplica solo en memoria.
+- B. El cambio se aplica en memoria y en el SPFILE.
+- C. El cambio se aplica solo en el SPFILE.
+- D. Falla porque falta la cláusula SCOPE.
+
+**Respuesta: A.**
+
+### P7. Parámetros no modificables a nivel de PDB
+
+Conectado a `FREEPDB1`, un DBA ejecuta `ALTER SYSTEM SET processes = 300 SCOPE = SPFILE;`. ¿Qué ocurre?
+
+- A. Se aplica solo a FREEPDB1 en el próximo arranque.
+- B. Se aplica a toda la instancia en el próximo arranque.
+- C. Falla con `ORA-65040` porque `PROCESSES` no es modificable a nivel de PDB.
+- D. Falla con `ORA-02095` porque `PROCESSES` es estático.
+
+**Respuesta: C.**
+
+### P8. Recuperación ante un SPFILE incorrecto
+
+¿Qué dos sentencias permiten recuperar una instancia que no arranca por un valor erróneo escrito en el SPFILE? (Elige dos.)
+
+- A. `STARTUP PFILE='/ruta/init_bueno.ora'`
+- B. `ALTER SYSTEM RESET ... SCOPE = MEMORY`
+- C. `CREATE SPFILE FROM PFILE='/ruta/init_bueno.ora'`
+- D. `ALTER DATABASE OPEN RESETLOGS`
+- E. `SHUTDOWN ABORT`
+
+**Respuesta: A y C.**
+
+### P9. Gestión de memoria y buffer cache
+
+Una instancia tiene `MEMORY_TARGET = 0`, `SGA_TARGET = 2G` y `DB_CACHE_SIZE = 512M`. ¿Qué afirmación es correcta?
+
+- A. El buffer cache tendrá exactamente 512 MB siempre.
+- B. ASMM gestiona la SGA y el buffer cache nunca bajará de 512 MB.
+- C. AMM gestiona SGA y PGA juntas.
+- D. `DB_CACHE_SIZE` se ignora porque `SGA_TARGET` está fijado.
+
+**Respuesta: B.**
+
+### P10. Estructuras de la PGA
+
+¿Qué dos estructuras forman parte de la PGA de un proceso servidor dedicado? (Elige dos.)
+
+- A. El área de ordenación (*sort area*) de una consulta con `ORDER BY`.
+- B. El shared pool.
+- C. El log buffer.
+- D. La información de sesión (*session memory*) en servidor dedicado.
+- E. El buffer cache.
+
+**Respuesta: A y D.**
+
+### P11. Proceso que completa la escritura durante COMMIT
+
+Un usuario ejecuta `COMMIT`. ¿Qué proceso debe completar su escritura antes de que el `COMMIT` devuelva el control?
+
+- A. DBWn
+- B. CKPT
+- C. LGWR
+- D. ARCn
+- E. SMON
+
+**Respuesta: C.**
+
+### P12. Procesos de background obligatorios
+
+¿Qué dos procesos de background son obligatorios en cualquier instancia de Oracle? (Elige dos.)
+
+- A. ARC0
+- B. PMON
+- C. RECO solo si hay database links
+- D. SMON
+- E. CJQ0
+
+**Respuesta: B y D.**
