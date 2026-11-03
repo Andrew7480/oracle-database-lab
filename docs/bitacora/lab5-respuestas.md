@@ -4,7 +4,9 @@ Documento de trabajo para responder las preguntas de comprobación y desarrollar
 
 ## Índice
 
-1. [Prácticas profesionales](#prácticas-profesionales)
+1. [RTO, RPO y SLO](#71-rto-rpo-y-slo)
+2. [Retrospectiva sin culpables](#72-retrospectiva-sin-culpables)
+3. [Prácticas profesionales](#prácticas-profesionales)
    - [Parte B — BFR de PEDIDO](#parte-b--comprueba-el-bfr-de-pedido-con-tus-propias-manos)
    - [Parte C — Calcular antes de medir](#parte-c--calcula-antes-de-medir)
    - [Parte D — Índice cubriente](#parte-d--el-índice-cubriente-que-sí-pedirías)
@@ -17,9 +19,32 @@ Documento de trabajo para responder las preguntas de comprobación y desarrollar
    - [Parte M — Coste de un DELETE en la FRA](#parte-m--el-coste-de-un-delete-en-tu-fra)
    - [Parte O — Runbook del simulacro D](#parte-o--escribe-el-runbook-del-simulacro-d)
    - [Parte P — Umbral de alerta](#parte-p--un-umbral-que-dispare-una-alerta)
-2. [Preguntas de comprobación](#8-preguntas-de-comprobación)
-3. [Preguntas tipo examen](#preguntas-tipo-examen)
+4. [Preguntas de comprobación](#8-preguntas-de-comprobación)
+5. [Preguntas tipo examen](#preguntas-tipo-examen)
 
+## 7.1. RTO, RPO y SLO
+
+Un servicio no promete «no fallar nunca»; promete cifras. Para TiendaSur, el objetivo de referencia es **RPO = 0 para pedidos confirmados** y **RTO menor de 15 minutos para un fallo de datafile**. Los simulacros sirven para demostrar el cumplimiento con datos medidos.
+
+| Simulacro | Fallo probado | Resultado medido | RPO | RTO | Evidencia |
+|---|---|---|---:|---:|---|
+| A | Caída abrupta de instancia | SMON leyó **32 KB** de redo y recuperó **47 bloques**; 102 quedó `EGRESADO` y 103 volvió a `ACTIVO` | 0 para lo confirmado | Recuperación automática; no se cronometró un valor independiente | `20261103T021629Z_14a-caida-instancia.script.log`, líneas 19-32 |
+| B | Pérdida de una copia del control file | `ORA-00205` al montar; las otras copias permiten sustituir la ruta dañada | 0 | No se cronometró | `20261103T021702Z_14b-perdida-controlfile.script.log`, líneas 6-27 |
+| C | Restauración completa desde copia | Se perdió lo hecho durante **1 s** entre la copia y el fallo; restauración en **77 s** | 1 s de cambios posteriores a la copia | 77 s | `20261103T033304Z_14c-simulacro-restauracion.script.log`, líneas 52-54 |
+| D | Pérdida de un datafile de aplicación | Se restauró y recuperó el datafile; la fila 104 quedó `EGRESADO` | 0 | **8 s** de offline a online; **9 s** desde el fallo | `20261103T022359Z_14d-perdida-datafile.script.log`, líneas 51-60 |
+
+El simulacro D cumple el objetivo de referencia: su RPO fue 0 y su RTO de 9 segundos quedó por debajo de 15 minutos. El simulacro C tiene un RPO distinto porque depende de una copia en frío y no de redo archivado aplicado hasta el instante del fallo.
+
+## 7.2. Retrospectiva sin culpables
+
+### Incidente: DML colgado por FRA llena (entorno de laboratorio)
+
+- **Impacto:** una carga quedó bloqueada por `log file switch (archiving needed)`; no hubo pérdida de datos.
+- **Detección:** `ORA-19815` avisó que la FRA estaba al **100 %**, con **0 bytes restantes**; después apareció `ORA-19809` (`20261103T020313Z_11-fra-llena.script.log`, líneas 32-33).
+- **Causa raíz:** se generó redo con `ARCHIVELOG` activo después de reducir la FRA a **2 MB** para el experimento, aunque el tamaño normal era **4096 MB**.
+- **Mitigación:** se liberó espacio mediante RMAN y ARCn pudo reintentar; la FRA volvió a mostrar **8.4 MB usados** (`líneas 39-46`). `RMAN DELETE NOPROMPT ARCHIVELOG ALL` es aceptable solo en laboratorio, no como procedimiento de producción sin validar respaldo y retención.
+- **Qué cambia:** el runbook debe alertar al **80 %** de uso y revisar `V$RECOVERY_AREA_USAGE` antes de repetir cargas; la consulta de alerta de este documento dispara a partir de **85 %**.
+- **Lección:** el aviso `ORA-19815` llegó antes del bloqueo y no estaba siendo vigilado. La alerta debe notificar al DBA antes de que ARCn no pueda archivar.
 
 ## Prácticas profesionales
 
@@ -27,19 +52,38 @@ Documento de trabajo para responder las preguntas de comprobación y desarrollar
 
 Calcula, con `DBMS_ROWID.ROWID_BLOCK_NUMBER`, cuántas filas hay en los bloques de `PEDIDO` (mínimo, media y máximo) y compáralo con `NUM_ROWS / BLOCKS`. Agrupa por bloque y calcula `MIN`, `AVG` y `MAX` del recuento. Anota por qué no todos los bloques tienen las mismas filas.
 
+**Respuesta:** La consulta usada es:
+
+```sql
+SELECT MIN(filas_bloque), AVG(filas_bloque), MAX(filas_bloque)
+FROM (
+  SELECT DBMS_ROWID.ROWID_BLOCK_NUMBER(rowid) bloque, COUNT(*) filas_bloque
+  FROM tiendasur.pedido
+  GROUP BY DBMS_ROWID.ROWID_BLOCK_NUMBER(rowid)
+);
+```
+
+La estadística global da `NUM_ROWS = 1 000 000` y `BLOCKS = 5 320`, por lo que `NUM_ROWS / BLOCKS = 187.97`, aproximadamente **188 filas por bloque** (`20261103T002048Z_01-perfil-tiendasur.script.log`, líneas 1-7). El mínimo y el máximo no quedaron impresos en el log conservado; no los invento: deben copiarse de la salida de esta consulta. Las diferencias se deben al tamaño real de las filas, cabeceras, `PCTFREE`, bloques parcialmente llenos y al historial de inserciones.
+
 ### Parte C — Calcula antes de medir
 
 1. Con los datos de la Parte B, calcula a mano la altura que tendrá `UX_CLI_EMAIL` (100 000 entradas). Supón 30 bytes por entrada de hoja y el mismo factor de ramificación máximo que `IX_PED_CLIENTE`.
 2. Comprueba el cálculo con `ANALYZE INDEX tiendasur.ux_cli_email VALIDATE STRUCTURE;` y consulta `INDEX_STATS`.
 3. Dibuja con `grafico-indice.sh` el índice `UX_CLI_EMAIL` y explica por qué su mapa tiene esa forma.
 
+**Respuesta:** Con 100 000 entradas y 30 bytes por entrada, la hoja necesita aproximadamente `100000 × 30 / 7996 = 376` bloques útiles. Usando el fan-out máximo de `IX_PED_CLIENTE` (`fo = 543`), la altura esperada es `1 + ceil(log_543(376)) = 2` niveles. La comprobación de `UX_CLI_EMAIL` registra altura **3**, **501 hojas** y **100 000 entradas** (`20261103T010315Z_02-anatomia-indice.script.log`, líneas 6-10); la diferencia se explica por cabeceras, ROWID y espacio reservado. El mapa debe mostrar hojas uniformes, aproximadamente **200 entradas por hoja**, sin entradas borradas.
+
 ### Parte D — El índice cubriente que sí pedirías
 
 Q9 (los 20 pedidos más recientes con todas sus columnas) usa `IX_PED_FECHA`. Decide si añadirías columnas para hacerlo cubriente, mide la versión actual con `lab_tools.medir.consulta` y razona la decisión.
 
+**Respuesta:** No añadiría todas las columnas para cubrir `SELECT *`: haría el índice muy ancho y encarecería cada `INSERT`. La versión actual devuelve **20 filas con 26 lecturas lógicas** usando `INDEX FULL SCAN DESCENDING IX_PED_FECHA` y acceso a la tabla (`20261103T013225Z_06-indices.script.log`, sección de medidas de Q9). Solo pediría un índice cubriente si el panel seleccionara pocas columnas estables.
+
 ### Parte E — Dibuja tu curva
 
 Copia las columnas de la sección 3 de tu evidencia en una hoja de cálculo o con `awk` en la terminal y dibuja las tres curvas en escala logarítmica de `k`. Marca dónde se cruza cada índice con la línea de la tabla entera y dónde cambia el optimizador. Incluye la imagen en tus respuestas y explica en tres líneas por qué los tres puntos no coinciden.
+
+**Respuesta:** La tabla completa permanece en **5232 lecturas**; el índice con CF bueno cruza esa línea cerca del 100 %, mientras el índice con CF malo la cruza entre **0.1 % y 0.2 %**. El punto teórico (`0.53 %` en lecturas lógicas) no coincide exactamente porque intervienen hojas del índice, *batching*, caché y el coste de lecturas aleatorias. El optimizador usa además estimaciones y costes internos (`20261103T011658Z_04-agrupamiento-equilibrio.script.log`, sección 3).
 
 ### Parte F — Revisión de código como en un equipo real
 
@@ -54,13 +98,19 @@ WHERE SUBSTR(telefono, 1, 3) = '600'
 
 Escribe el comentario de revisión: qué reglas rompe, la reescritura propuesta y las lecturas medidas antes y después con `lab_tools.medir.consulta`. Los índices temporales de esta parte se borran al final del script: créalos de nuevo para la prueba y bórralos después.
 
+**Respuesta — comentario de revisión:** La consulta aplica `SUBSTR` y `UPPER` sobre columnas y usa `OR`; rompe la sargabilidad. Si la intención era una coincidencia conjunta, propondría `WHERE telefono LIKE '600%' AND apellidos = 'GIL'`; si era `OR`, mantendría índices en ambas ramas y usaría `UNION` con deduplicación. En la prueba equivalente, el `OR` sin índice de teléfono hizo **1486 lecturas**, y con ambos índices bajó a **6**; la versión con `UNION` también hizo **6** (`20261103T012326Z_05-sargabilidad.script.log`, líneas 42-52).
+
 ### Parte G — Defiende tu propio índice
 
 Elige una consulta de la Actividad 3.2 que `V005` no cubra y propón un índice. Escríbelo como `V006` en una rama aparte, pásalo por las cinco preguntas con números del banco (lecturas antes y después, bloques por fila de `INSERT` con `06-medir-dml.sql` y redundancia) y redacta la descripción del *Pull Request*. Si no compensa, documéntalo y no lo fusiones.
 
+**Respuesta:** Elegí Q7, el historial por cliente, y propuse `IX_PED_CLI_FEC (id_cliente, fecha_pedido DESC)`. La consulta pasó de **15** a **7** lecturas; la versión cubriente baja a **3** (`20261103T011106Z_03-tipos-indice.script.log`, sección 3). `IX_PED_CLIENTE` queda cubierto por el prefijo del índice compuesto. El coste medido pasó de **10.1 bloques por INSERT** con 4 índices a **20.2** con 9, aproximadamente 2 por índice (`20261103T013225Z_06-indices.script.log`, líneas 7, 20 y 68-75). **PR:** “Añade índice compuesto para ordenar el historial por cliente sin SORT; incluye lecturas antes/después, coste DML y eliminación del índice simple redundante”.
+
 ### Parte H — Diagnostica sin ver el script
 
 El profesor creará un índice degradado en un esquema de pruebas sin indicar cómo. Con `grafico-indice.sh` e `INDEX_STATS`, decide si está sano, fragmentado o en patrón cola; propón el remedio y justifícalo con dos cifras antes y después. Entrega el diagnóstico como comentario en tu *Issue*.
+
+**Respuesta — diagnóstico:** Era patrón cola: `INDEX_STATS` mostró **70 619 entradas borradas**, el **41 %** de 170 619, y la búsqueda del mensaje más antiguo costó **226 lecturas** (`20261103T013805Z_07b-patron-cola.script.log`, líneas 1-16). Elegí `COALESCE`, que dejó **0 entradas borradas** y redujo la consulta a **2 lecturas**, en línea (`20261103T013805Z_07c-remedios.script.log`, líneas 1-15).
 
 ### Parte I — El MTTR bajo carga
 
@@ -72,6 +122,8 @@ FROM v$instance_recovery;
 ```
 
 Anota cuánto crecen ambos valores y explica en una frase la relación entre redo pendiente y tiempo de recuperación.
+
+**Respuesta:** El paso 1 registró **1779 KB de redo**, **3 escrituras LGWR** y **231 bloques sucios**; después del checkpoint DBWn escribió **347 bloques** y quedaron **0 bloques sucios** (`20261103T021318Z_13-lgwr-dbwn.script.log`, líneas 1-14). Cuanto más redo y bloques sucios quedan pendientes, mayor trabajo tiene que aplicar SMON y mayor es el MTTR.
 
 ### Parte K — Dimensiona el redo de TiendaSur
 
@@ -85,17 +137,42 @@ GROUP BY TO_CHAR(first_time, 'HH24');
 
 Propón un tamaño de grupo para que esa carga produjera como mucho cuatro cambios y escribe, sin ejecutarlos, los comandos para migrar a ese tamaño.
 
+**Respuesta:** La evidencia muestra grupos de **200 MB** y cambios en las secuencias 23 a 27 (`20261103T015543Z_10-redo.script.log`, líneas 1-7 y 64-66). Para no superar cuatro cambios, propongo grupos de **512 MB**, sujeto a confirmar el redo exacto y el espacio disponible. Los comandos serían:
+
+```sql
+ALTER DATABASE ADD LOGFILE GROUP 4
+  ('/opt/oracle/oradata/FREE/redo04.log',
+   '/opt/oracle/oradata/FREE/redo04b.log') SIZE 512M;
+```
+
+Repetiría para los grupos nuevos, haría `SWITCH LOGFILE` y retiraría los antiguos solo cuando estuvieran `INACTIVE` y archivados.
+
 ### Parte M — El coste de un DELETE en tu FRA
 
 Con la base en `ARCHIVELOG`, anota `SELECT space_used FROM v$recovery_file_dest;`, ejecuta el script `12-undoy-redo` una vez más y fuerza `ALTER SYSTEM ARCHIVE LOG CURRENT;`. Calcula cuánto creció la FRA, compáralo con la suma de la columna de redo de la tabla y explica la diferencia.
+
+**Respuesta:** La FRA pasó de **6.6 MB** a **8.4 MB**, un crecimiento de **1.8 MB** (`20261103T020313Z_11-fra-llena.script.log`, líneas 1-4 y 39-46). No coincide con el redo de una columna porque la FRA almacena archivados completos, metadatos, undo, índices y cambios de bloques. En el escenario extremo, una FRA de **2 MB** llegó al 100 % y produjo `ORA-19815` y `ORA-19809` (`líneas 32-33`).
 
 ### Parte O — Escribe el runbook del simulacro D
 
 Redacta en [`docs/runbooks/perdida-datafile.md`](../runbooks/perdida-datafile.md) el procedimiento para un compañero de guardia que no ha hecho este laboratorio: síntoma (los tres `ORA-` y, si aparece, `ORA-63999`), comprobaciones previas (`ARCHIVELOG`, copia disponible, `LIST BACKUP OF DATAFILE n;` y estado de la PDB), comandos para cada uno de los dos caminos, verificación (`V$PDBS` y la fila de control) y a quién avisar. Máximo una página.
 
+**Respuesta:** El procedimiento aplicado fue identificar el datafile 16 por `ORA-01116`, `ORA-01110` y `ORA-27041`, comprobar `ARCHIVELOG`, la copia RMAN y que `FREEPDB1` estaba `MOUNTED`, ejecutar `RESTORE DATAFILE 16`, `RECOVER DATAFILE 16`, devolverlo a `ONLINE` y abrir la PDB. Si aparece `ORA-63999`, se repara con la PDB montada y se abre después. La PDB quedó `READ WRITE`, la fila 104 sobrevivió, el RPO fue **0** y el RTO **8 s** desde offline a online (**9 s** desde el fallo) (`20261103T022359Z_14d-perdida-datafile.script.log`, líneas 25-60).
+
 ### Parte P — Un umbral que dispare una alerta
 
 Elige una de las nueve secciones y escribe la consulta que devolvería una sola fila solo cuando haya que despertar a alguien, por ejemplo, cuando la FRA supere el 85 % o no exista ninguna copia RMAN en 24 horas. Explica cómo se conectaría esta comprobación con un sistema de alertas.
+
+**Respuesta:** Elegí la FRA:
+
+```sql
+SELECT name, space_used, space_limit,
+       ROUND(space_used * 100 / space_limit, 2) pct_used
+FROM v$recovery_file_dest
+WHERE space_used * 100 / space_limit > 85;
+```
+
+En el simulacro, `ORA-19815` registró **100 %** de uso y **0 remaining**, seguido de `ORA-19809` (`20261103T020313Z_11-fra-llena.script.log`, líneas 32-33). Un job ejecutaría esta consulta periódicamente y enviaría la fila a la herramienta de alertas; si no devuelve filas, no despierta a nadie.
 
 ## 8. Preguntas de comprobación
 
