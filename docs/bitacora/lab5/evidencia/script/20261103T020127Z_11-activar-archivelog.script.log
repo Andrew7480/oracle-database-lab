@@ -1,0 +1,43 @@
+Modo actual: ARCHIVELOG
+== 1. Carpeta de la FRA dentro del volumen (persistente) ==
+== 2. Error de examen: ruta antes que tamaño (ORA-02097/ORA-19802 esperado si la FRA aún no tiene tamaño) ==
+
+System altered.
+
+== 3. Orden correcto: tamaño y luego ruta ==
+
+System altered.
+
+
+System altered.
+
+La base ya está en ARCHIVELOG: no hace falta reiniciar.
+== 5. Comprobación ==
+Database log mode	       Archive Mode
+Automatic archival	       Enabled
+Archive destination	       USE_DB_RECOVERY_FILE_DEST
+Oldest online log sequence     30
+Next log sequence to archive   29
+Current log sequence	       29
+
+ SEQUENCE# NAME 								MB ARC
+---------- ------------------------------------------------------------ ---------- ---
+	31 o1_mf_1_31_oglj3rxc_.arc						 0 YES
+	30 o1_mf_1_30_oglj3rqx_.arc					       6.5 YES
+	29 o1_mf_1_29_oglj1pjz_.arc						 0 YES
+	28 o1_mf_1_28_oglj1ph4_.arc						 0 YES
+
+FILE_TYPE		PERCENT_SPACE_USED NUMBER_OF_FILES
+----------------------- ------------------ ---------------
+ARCHIVED LOG			       .16		 4
+
+NAME							      LIMITE_MB   USADO_MB
+------------------------------------------------------------ ---------- ----------
+/opt/oracle/oradata/fra 					   4096 	 7
+
+PROCE
+-----
+ARC0
+ARC1
+ARC2
+ARC3
