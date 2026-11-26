@@ -30,7 +30,7 @@ Documento de trabajo para organizar las evidencias del Lab 6 y responder las pre
 Respóndelas con tus propias palabras y cita la evidencia (archivo y valor). Una respuesta sin una cifra de tu ejecución no puntúa.
 ### 9.1. Partes A-C · Rol operativo, parámetros y estados
 1. ¿Cuántos errores ORA- tenía tu alert log en 24 h en la Parte B y a qué se debían? ¿Por qué ese número no es una alarma por sí solo?
-**Respuesta:** El recuento fue de 6h. La salida de turno guarda el total, pero no el detalle de esos seis errores; hace falta consultar el alert log para atribuirles causas. El número aislado no basta para declarar una alarma: hay que compararlo con la línea base, la recurrencia, la gravedad y el impacto. ([turno](lab6/evidencia/script/20261125T104628Z_01-turno.script.log))
+**Respuesta:** El recuento fue de 6 errores. La salida de turno guarda el total, pero no el detalle de esos seis errores; hace falta consultar el alert log para atribuirles causas. El número aislado no basta para declarar una alarma: hay que compararlo con la línea base, la recurrencia, la gravedad y el impacto. ([turno](lab6/evidencia/script/20261125T104628Z_01-turno.script.log))
 
 2. ¿A qué hora empieza y cuánto dura la ventana de mantenimiento de un miércoles en tu base? ¿Qué tareas automáticas corren en ella?
 **Respuesta:** La ventana del miércoles empieza a las 22:00 y dura 4 horas. En ella están habilitadas la recopilación automática de estadísticas, el asesor de espacio y el asesor de ajuste SQL. ([automatización](lab6/evidencia/spool/20261125T105130Z_01-automatizacion.spool.log))
