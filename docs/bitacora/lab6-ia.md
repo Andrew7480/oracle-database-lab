@@ -14,7 +14,7 @@ Con este readme que tengo mi analisis sobre el sintoma, el contexto, la evidenci
 ALTER SESSION SET CONTAINER = FREEPDB1;
 ALTER SYSTEM KILL SESSION '68,42887' IMMEDIATE;
 ```
-- **Dónde lo usé (parte, script o pregunta):** paso 5 y redacción final de `docs/bitacora/lab6-guardia.md`.
+- **Dónde lo usé (parte, script o pregunta):** paso 5
 - **Propósito (para qué lo necesitaba):** Confirmar la sintaxis exacta para terminar la sesión bloqueadora dentro de la PDB usando el wrapper `sysdba.sh`.
 - **Qué hace (con mis palabras; línea a línea si es SQL corto):** 
   - Línea 1 (`ALTER SESSION SET CONTAINER = FREEPDB1;`): cambia el contexto de la sesión administrativa desde la raíz hacia la base conectable FREEPDB1, que es donde existe la sesión bloqueadora.
@@ -26,14 +26,14 @@ docs/bitacora/lab6/evidencia/script/20261125T235030Z_08-inc1-actuar.script.log
 - **Herramienta:** Gemini
 - **Prompt (literal, copiado tal cual):**
 ```text
-Con este readme que ya tengo de los tres incidentes resueltos, resumeme la informacion para agregar la seccion de postmortems sin culpables siguiendo la plantilla de la seccion 5.9.5.
+Con este readme que ya tengo de los tres incidentes resueltos, resumeme la informacion para agregar la seccion de postmortems sin culpables siguiendo la plantilla de la seccion 5.9.5. con mis ideas y mis palabras, es reescritura, no generacion de texto.
 ```
 - **Código recibido (el fragmento, o la ruta del archivo donde está):**
 ```markdown
 docs/bitacora/lab6-guardia.md (sección Postmortems sin culpables para INC-601, INC-602 e INC-603)
 ```
 - **Dónde lo usé (parte, script o pregunta):** Sección 5.9.5 (I.5 — El postmortem sin culpables) al final de `docs/bitacora/lab6-guardia.md`.
-- **Propósito (para qué lo necesitaba):** Sintetizar el diagnóstico, causa raíz sin culpables, intervención mínima, validación y acción preventiva de los tres incidentes atendidos en el turno en un formato estructurado.
+- **Propósito (para qué lo necesitaba):** Sintetizar el diagnóstico que yo hice, causa raíz sin culpables, intervención mínima, validación y acción preventiva de los tres incidentes atendidos en el turno en un formato estructurado.
 - **Qué hace (con mis palabras; línea a línea si es SQL corto):** 
   - No es código SQL ejecutable, sino documentación operativa en Markdown que resume cada incidente (INC-601, INC-602 e INC-603) enfocándose en las fallas técnicas del sistema y las mejoras preventivas para evitar que se repitan con lo que yo ya habia identificado.
 - **Evidencia de ejecución (archivo de docs/bitacora/lab6/evidencia con mi cabecera):** 
@@ -43,7 +43,7 @@ docs/bitacora/lab6/evidencia/script/20261125T235148Z_08-inc1-diagnostico-despues
 - **Herramienta:** Gemini
 - **Prompt (literal, copiado tal cual):**
 ```text
-ayudame a generar una pequeña descripcion y un indice para darle orden a todas las preguntas que se han ido respondiendo paso a paos en el laboratorio, arregla problemas de ortografia y de tipado si es necesario
+ayudame a generar una pequeña descripcion y un indice para darle orden a todas las preguntas que he ido respondiendo paso a paso en el laboratorio, arregla problemas de ortografia y de tipado si es necesario
 ```
 - **Código recibido (el fragmento, o la ruta del archivo donde está):**
 ```markdown
